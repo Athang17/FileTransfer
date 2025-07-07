@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Simple File Transfer</title>
+</head>
+<body>
+  <h1>Upload a file</h1>
+  <form id="uploadForm" enctype="multipart/form-data">
+    <input type="file" name="file" id="fileInput" required />
+    <button type="submit">Upload</button>
+  </form>
+  <div id="result" style="margin-top:20px;"></div>
+
+  <script>
+    const form = document.getElementById('uploadForm');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fileInput = document.getElementById('fileInput');
+      const file = fileInput.files[0];
+      if (!file) return alert('Please select a file');
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const resultDiv = document.getElementById('result');
+      resultDiv.textContent = 'Uploading...';
+
+      try {
+        const res = await fetch('/upload', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+
+        if(data.url) {
+          resultDiv.innerHTML = `File URL: <a href="${data.url}" target="_blank">${data.url}</a>`;
+        } else {
+          resultDiv.textContent = 'Upload failed.';
+        }
+      } catch (err) {
+        resultDiv.textContent = 'Upload failed.';
+        console.error(err);
+      }
+    });
+  </script>
+</body>
+</html>
