@@ -3,6 +3,62 @@
   <head>
     <meta charset="UTF-8" />
     <title>Simple File Transfer</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 600px;
+        margin: 40px auto;
+        padding: 0 20px;
+        background: #f9f9f9;
+      }
+      h1 {
+        text-align: center;
+        color: #333;
+      }
+      form {
+        background: #fff;
+        padding: 20px;
+        border-radius: 6px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+      }
+      input[type="file"] {
+        padding: 5px;
+      }
+      input[type="text"] {
+        padding: 10px;
+        font-size: 1rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      button {
+        padding: 12px;
+        font-size: 1rem;
+        background-color: #007bff;
+        border: none;
+        color: white;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      #result {
+        margin-top: 20px;
+        font-size: 1.1rem;
+        word-break: break-word;
+      }
+      a {
+        color: #007bff;
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+    </style>
   </head>
   <body>
     <h1>Upload a file</h1>
@@ -12,13 +68,13 @@
         type="text"
         name="customName"
         id="customName"
-        placeholder="Enter filename (with extension)"
+        placeholder="Enter filename (without extension)"
         required
       />
       <button type="submit">Upload</button>
     </form>
 
-    <div id="result" style="margin-top: 20px"></div>
+    <div id="result"></div>
 
     <script>
       const form = document.getElementById("uploadForm");
@@ -30,8 +86,14 @@
         const file = fileInput.files[0];
         const customName = customNameInput.value.trim();
 
-        if (!file) return alert("Please select a file");
-        if (!customName) return alert("Please enter a filename");
+        if (!file) {
+          alert("Please select a file");
+          return;
+        }
+        if (!customName) {
+          alert("Please enter a filename");
+          return;
+        }
 
         const formData = new FormData();
         formData.append("file", file);
@@ -48,7 +110,7 @@
           const data = await res.json();
 
           if (data.url) {
-            resultDiv.innerHTML = `File URL (valid for 1 hour): <a href="${data.url}" target="_blank">${data.url}</a>`;
+            resultDiv.innerHTML = `File URL (valid for 1 hour): <a href="${data.url}" target="_blank" rel="noopener noreferrer">${data.url}</a>`;
           } else if (data.error) {
             resultDiv.textContent = `Error: ${data.error}`;
           } else {
