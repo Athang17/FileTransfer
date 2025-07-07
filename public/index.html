@@ -1,48 +1,64 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Simple File Transfer</title>
-</head>
-<body>
-  <h1>Upload a file</h1>
-  <form id="uploadForm" enctype="multipart/form-data">
-    <input type="file" name="file" id="fileInput" required />
-    <button type="submit">Upload</button>
-  </form>
-  <div id="result" style="margin-top:20px;"></div>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Simple File Transfer</title>
+  </head>
+  <body>
+    <h1>Upload a file</h1>
+    <form id="uploadForm" enctype="multipart/form-data">
+      <input type="file" name="file" id="fileInput" required />
+      <input
+        type="text"
+        name="customName"
+        id="customName"
+        placeholder="Enter filename (with extension)"
+        required
+      />
+      <button type="submit">Upload</button>
+    </form>
 
-  <script>
-    const form = document.getElementById('uploadForm');
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const fileInput = document.getElementById('fileInput');
-      const file = fileInput.files[0];
-      if (!file) return alert('Please select a file');
+    <div id="result" style="margin-top: 20px"></div>
 
-      const formData = new FormData();
-      formData.append('file', file);
+    <script>
+      const form = document.getElementById("uploadForm");
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
 
-      const resultDiv = document.getElementById('result');
-      resultDiv.textContent = 'Uploading...';
+        const fileInput = document.getElementById("fileInput");
+        const customNameInput = document.getElementById("customName");
+        const file = fileInput.files[0];
+        const customName = customNameInput.value.trim();
 
-      try {
-        const res = await fetch('/upload', {
-          method: 'POST',
-          body: formData
-        });
-        const data = await res.json();
+        if (!file) return alert("Please select a file");
+        if (!customName) return alert("Please enter a filename");
 
-        if(data.url) {
-          resultDiv.innerHTML = `File URL: <a href="${data.url}" target="_blank">${data.url}</a>`;
-        } else {
-          resultDiv.textContent = 'Upload failed.';
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("customName", customName);
+
+        const resultDiv = document.getElementById("result");
+        resultDiv.textContent = "Uploading...";
+
+        try {
+          const res = await fetch("/upload", {
+            method: "POST",
+            body: formData,
+          });
+          const data = await res.json();
+
+          if (data.url) {
+            resultDiv.innerHTML = `File URL (valid for 1 hour): <a href="${data.url}" target="_blank">${data.url}</a>`;
+          } else if (data.error) {
+            resultDiv.textContent = `Error: ${data.error}`;
+          } else {
+            resultDiv.textContent = "Upload failed.";
+          }
+        } catch (err) {
+          resultDiv.textContent = "Upload failed.";
+          console.error(err);
         }
-      } catch (err) {
-        resultDiv.textContent = 'Upload failed.';
-        console.error(err);
-      }
-    });
-  </script>
-</body>
+      });
+    </script>
+  </body>
 </html>

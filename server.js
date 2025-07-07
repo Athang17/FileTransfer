@@ -4,46 +4,73 @@ const path = require('path');
 const fs = require('fs');
 
 const app = express();
-
-// Store files directly in project root
 const uploadDir = __dirname;
 
-// Configure multer storage to keep original filename
+// Multer storage with dynamic filename from `customName`
 const storage = multer.diskStorage({
   destination: uploadDir,
   filename: (req, file, cb) => {
-    cb(null, file.originalname); // Keep original name exactly
+    // We won't set filename here; we'll handle it manually below
+    cb(null, file.originalname);
   }
 });
 const upload = multer({ storage });
 
-app.use(express.static('public')); // serve frontend files
-
-// Upload endpoint
+// To handle file upload with custom filename and check for existence, use a custom middleware:
 app.post('/upload', upload.single('file'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No file uploaded' });
+  const customName = req.body.customName;
+  const file = req.file;
+
+  if (!file) return res.status(400).json({ error: 'No file uploaded' });
+  if (!customName) {
+    // Delete uploaded temp file, since no custom name
+    fs.unlinkSync(file.path);
+    return res.status(400).json({ error: 'Custom filename required' });
   }
-  
-  // URL to access the file directly from root
-  const fileUrl = `${req.protocol}://${req.get('host')}/${encodeURIComponent(req.file.originalname)}`;
-  res.json({ url: fileUrl });
+
+  // Sanitize filename to avoid directory traversal etc.
+  const safeName = path.basename(customName);
+
+  // Check if file with this name already exists
+  const filePath = path.join(uploadDir, safeName);
+  if (fs.existsSync(filePath)) {
+    // Delete uploaded temp file
+    fs.unlinkSync(file.path);
+    return res.status(400).json({ error: 'File with this name already exists' });
+  }
+
+  // Rename/move uploaded file to desired name
+  fs.rename(file.path, filePath, (err) => {
+    if (err) {
+      return res.status(500).json({ error: 'File saving failed' });
+    }
+
+    // Schedule deletion after 1 hour (3600000 ms)
+    setTimeout(() => {
+      fs.unlink(filePath, (err) => {
+        if (err) console.error(`Error deleting file ${safeName}:`, err);
+        else console.log(`Deleted file after 1 hour: ${safeName}`);
+      });
+    }, 3600000);
+
+    // Send back URL to access/download the file
+    const fileUrl = `${req.protocol}://${req.get('host')}/${encodeURIComponent(safeName)}`;
+    res.json({ url: fileUrl });
+  });
 });
 
-// Serve uploaded files from root and force download
+// Serve files and force download
 app.get('/:filename', (req, res, next) => {
-  const filePath = path.join(uploadDir, req.params.filename);
+  const safeName = path.basename(req.params.filename);
+  const filePath = path.join(uploadDir, safeName);
 
   fs.access(filePath, fs.constants.F_OK, (err) => {
     if (err) {
-      return res.status(404).send('File not found');
+      return res.status(404).send('File not found or expired');
     }
 
-    // Set headers to force download
-    res.download(filePath, req.params.filename, (err) => {
-      if (err) {
-        next(err);
-      }
+    res.download(filePath, safeName, (err) => {
+      if (err) next(err);
     });
   });
 });
