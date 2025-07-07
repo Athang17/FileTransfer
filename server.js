@@ -9,11 +9,14 @@ app.use(express.static('public'));
 
 const uploadDir = __dirname;
 
+// Map to store custom base name -> original filename (in-memory)
+const originalNames = {};
+
 // Multer storage with dynamic filename from `customName`
 const storage = multer.diskStorage({
   destination: uploadDir,
   filename: (req, file, cb) => {
-    // We won't set filename here; we'll handle it manually below
+    // We won't set filename here; handled manually below
     cb(null, file.originalname);
   }
 });
@@ -41,11 +44,18 @@ app.post('/upload', upload.single('file'), (req, res) => {
   fs.rename(file.path, filePath, (err) => {
     if (err) return res.status(500).json({ error: 'File saving failed' });
 
+    // Store original filename for download
+    originalNames[path.parse(safeName).name] = file.originalname;
+
     // Delete after 1 hour
     setTimeout(() => {
       fs.unlink(filePath, err => {
         if (err) console.error(`Error deleting file ${safeName}:`, err);
-        else console.log(`Deleted file after 1 hour: ${safeName}`);
+        else {
+          console.log(`Deleted file after 1 hour: ${safeName}`);
+          // Remove mapping when file is deleted
+          delete originalNames[path.parse(safeName).name];
+        }
       });
     }, 3600000);
 
@@ -57,7 +67,6 @@ app.post('/upload', upload.single('file'), (req, res) => {
 app.get('/:filename', (req, res, next) => {
   const baseName = path.basename(req.params.filename);
 
-  // Look for a file starting with the given base name (e.g., "t1.*")
   fs.readdir(uploadDir, (err, files) => {
     if (err) return res.status(500).send('Server error');
 
@@ -66,7 +75,9 @@ app.get('/:filename', (req, res, next) => {
     if (!matchedFile) return res.status(404).send('File not found or expired');
 
     const filePath = path.join(uploadDir, matchedFile);
-    res.download(filePath, matchedFile, err => {
+    const downloadName = originalNames[baseName] || matchedFile;
+
+    res.download(filePath, downloadName, err => {
       if (err) next(err);
     });
   });
