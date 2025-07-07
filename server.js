@@ -49,23 +49,24 @@ app.post('/upload', upload.single('file'), (req, res) => {
       });
     }, 3600000);
 
-    const fileUrl = `${req.protocol}://${req.get('host')}/${encodeURIComponent(safeName)}`;
+    const fileUrl = `${req.protocol}://${req.get('host')}/${encodeURIComponent(path.parse(safeName).name)}`;
     res.json({ url: fileUrl });
   });
 });
 
-
-// Serve files and force download
 app.get('/:filename', (req, res, next) => {
-  const safeName = path.basename(req.params.filename);
-  const filePath = path.join(uploadDir, safeName);
+  const baseName = path.basename(req.params.filename);
 
-  fs.access(filePath, fs.constants.F_OK, (err) => {
-    if (err) {
-      return res.status(404).send('File not found or expired');
-    }
+  // Look for a file starting with the given base name (e.g., "t1.*")
+  fs.readdir(uploadDir, (err, files) => {
+    if (err) return res.status(500).send('Server error');
 
-    res.download(filePath, safeName, (err) => {
+    const matchedFile = files.find(file => path.parse(file).name === baseName);
+
+    if (!matchedFile) return res.status(404).send('File not found or expired');
+
+    const filePath = path.join(uploadDir, matchedFile);
+    res.download(filePath, matchedFile, err => {
       if (err) next(err);
     });
   });
