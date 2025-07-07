@@ -4,6 +4,9 @@ const path = require('path');
 const fs = require('fs');
 
 const app = express();
+
+app.use(express.static('public'));
+
 const uploadDir = __dirname;
 
 // Multer storage with dynamic filename from `customName`
@@ -16,48 +19,41 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// To handle file upload with custom filename and check for existence, use a custom middleware:
 app.post('/upload', upload.single('file'), (req, res) => {
-  const customName = req.body.customName;
+  const customBase = req.body.customName;
   const file = req.file;
 
   if (!file) return res.status(400).json({ error: 'No file uploaded' });
-  if (!customName) {
-    // Delete uploaded temp file, since no custom name
+  if (!customBase) {
     fs.unlinkSync(file.path);
     return res.status(400).json({ error: 'Custom filename required' });
   }
 
-  // Sanitize filename to avoid directory traversal etc.
-  const safeName = path.basename(customName);
-
-  // Check if file with this name already exists
+  const originalExt = path.extname(file.originalname);
+  const safeName = path.basename(customBase) + originalExt;
   const filePath = path.join(uploadDir, safeName);
+
   if (fs.existsSync(filePath)) {
-    // Delete uploaded temp file
     fs.unlinkSync(file.path);
     return res.status(400).json({ error: 'File with this name already exists' });
   }
 
-  // Rename/move uploaded file to desired name
   fs.rename(file.path, filePath, (err) => {
-    if (err) {
-      return res.status(500).json({ error: 'File saving failed' });
-    }
+    if (err) return res.status(500).json({ error: 'File saving failed' });
 
-    // Schedule deletion after 1 hour (3600000 ms)
+    // Delete after 1 hour
     setTimeout(() => {
-      fs.unlink(filePath, (err) => {
+      fs.unlink(filePath, err => {
         if (err) console.error(`Error deleting file ${safeName}:`, err);
         else console.log(`Deleted file after 1 hour: ${safeName}`);
       });
     }, 3600000);
 
-    // Send back URL to access/download the file
     const fileUrl = `${req.protocol}://${req.get('host')}/${encodeURIComponent(safeName)}`;
     res.json({ url: fileUrl });
   });
 });
+
 
 // Serve files and force download
 app.get('/:filename', (req, res, next) => {
